@@ -24,7 +24,8 @@
 
 # ```bash
 
-# dotnet tool install --global reqnroll.stepreport
+# dotnet tool install -g stepreport.cli
+
 
 🚀 Usage
 Run this command inside your Reqnroll project or point it to the folder:
