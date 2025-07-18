@@ -25,48 +25,73 @@ foreach (var file in files)
     {
         var line = lines[i].Trim();
 
+        // Match [StepDefinition("Given", "...")]
+        var stepDefFullMatch = Regex.Match(line, @"\[StepDefinition\(\s*""(Given|When|Then)""\s*,\s*@?""(.+?)""\s*\)\]");
+
+        // Match [StepDefinition("...")] (no step type specified)
+        var stepDefGenericMatch = Regex.Match(line, @"\[StepDefinition\(\s*@?""(.+?)""\s*\)\]");
+
+        // Match legacy attributes: [Given("...")], etc.
+        Match legacyMatch = null;
+        string matchedAttr = null;
+
         foreach (var attr in stepAttributes)
         {
-            var pattern = $@"\[{attr}\(\s*""(.+?)""\s*\)\]";
+            var pattern = $@"\[{attr}\(\s*@?""(.+?)""\s*\)\]";
             var match = Regex.Match(line, pattern);
-
             if (match.Success)
             {
-                string expression = match.Groups[1].Value;
-                var parameters = new List<string>();
+                legacyMatch = match;
+                matchedAttr = attr;
+                break;
+            }
+        }
 
-                // Look at the next line for method signature
-                var nextLine = lines[i + 1].Trim();
-                var methodPattern = new Regex(@"\w+\s+\w+\s*\(([^)]*)\)");
-                var methodMatch = methodPattern.Match(nextLine);
+        // Prepare method parameters from the next line
+        var nextLine = lines[i + 1].Trim();
+        var methodPattern = new Regex(@"\w+\s+\w+\s*\(([^)]*)\)");
+        var methodMatch = methodPattern.Match(nextLine);
 
-                if (methodMatch.Success)
+        var parameters = new List<string>();
+        if (methodMatch.Success)
+        {
+            var paramList = methodMatch.Groups[1].Value;
+            if (!string.IsNullOrWhiteSpace(paramList))
+            {
+                var paramPairs = paramList.Split(',');
+                foreach (var param in paramPairs)
                 {
-                    var paramList = methodMatch.Groups[1].Value;
-                    if (!string.IsNullOrWhiteSpace(paramList))
+                    var parts = param.Trim().Split(' ');
+                    if (parts.Length >= 2)
                     {
-                        var paramPairs = paramList.Split(',');
-                        foreach (var param in paramPairs)
-                        {
-                            var parts = param.Trim().Split(' ');
-                            if (parts.Length >= 2)
-                            {
-                                parameters.Add(parts[0]); // just the type
-                            }
-                        }
+                        parameters.Add(parts[0]); // just the type
                     }
                 }
+            }
+        }
 
-                var folder = Path.GetFileName(Path.GetDirectoryName(file));
-                Console.WriteLine($"✅ Matched [{attr}] {expression}");
+        var folder = Path.GetFileName(Path.GetDirectoryName(file))!;
 
-                results.Add(new StepDefinition
-                {
-                    StepDefinitionType = attr,
-                    Expression = expression,
-                    Parameters = parameters,
-                    Folder = folder
-                });
+        // Add step for legacy [Given]/[When]/[Then]
+        if (legacyMatch != null)
+        {
+            string expression = legacyMatch.Groups[1].Value;
+            AddStep(matchedAttr!, expression, parameters, folder);
+        }
+        // Add step for [StepDefinition("Given", "...")]
+        else if (stepDefFullMatch.Success)
+        {
+            string attr = stepDefFullMatch.Groups[1].Value;
+            string expression = stepDefFullMatch.Groups[2].Value;
+            AddStep(attr, expression, parameters, folder);
+        }
+        // Add step for [StepDefinition("...")] — apply to all 3
+        else if (stepDefGenericMatch.Success)
+        {
+            string expression = stepDefGenericMatch.Groups[1].Value;
+            foreach (var attr in stepAttributes)
+            {
+                AddStep(attr, expression, parameters, folder);
             }
         }
     }
@@ -102,6 +127,19 @@ if (uniqueResults.Count > 0)
 else
 {
     Console.WriteLine("⚠️ No step definitions found.");
+}
+
+void AddStep(string attr, string expression, List<string> parameters, string folder)
+{
+    Console.WriteLine($"✅ Matched [{attr}] {expression}");
+
+    results.Add(new StepDefinition
+    {
+        StepDefinitionType = attr,
+        Expression = expression,
+        Parameters = parameters,
+        Folder = folder
+    });
 }
 
 record StepDefinition
