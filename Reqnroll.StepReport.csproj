@@ -8,7 +8,7 @@
     <Authors>Nikolas Iatrou</Authors>
     <Description>CLI tool to extract Reqnroll step definitions into JSON</Description>
     <PackageId>stepreport.cli</PackageId>
-    <Version>1.0.5</Version>
+    <Version>1.0.52</Version>
     <RepositoryUrl>https://github.com/IatrouNick/stepreport.cli</RepositoryUrl>
   </PropertyGroup>
 

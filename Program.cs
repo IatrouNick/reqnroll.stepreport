@@ -28,12 +28,12 @@ foreach (var file in files)
         // Match [StepDefinition("Given", "...")]
         var stepDefFullMatch = Regex.Match(line, @"\[StepDefinition\(\s*""(Given|When|Then)""\s*,\s*@?""(.+?)""\s*\)\]");
 
-        // Match [StepDefinition("...")] (no step type specified)
+        // Match [StepDefinition("...")]
         var stepDefGenericMatch = Regex.Match(line, @"\[StepDefinition\(\s*@?""(.+?)""\s*\)\]");
 
-        // Match legacy attributes: [Given("...")], etc.
-        Match legacyMatch = null;
-        string matchedAttr = null;
+        // Match legacy attributes [Given("...")], etc.
+        Match? legacyMatch = null;
+        string? matchedAttr = null;
 
         foreach (var attr in stepAttributes)
         {
@@ -64,7 +64,7 @@ foreach (var file in files)
                     var parts = param.Trim().Split(' ');
                     if (parts.Length >= 2)
                     {
-                        parameters.Add(parts[0]); // just the type
+                        parameters.Add(parts[0]); // Just the type
                     }
                 }
             }
@@ -99,7 +99,7 @@ foreach (var file in files)
 
 // ✅ Normalize and remove duplicates
 var grouped = results
-    .GroupBy(r => $"{r.StepDefinitionType}:{Regex.Unescape(r.Expression).Trim()}");
+    .GroupBy(r => $"{r.StepDefinitionType}:{r.Expression.Trim()}");
 
 foreach (var group in grouped)
 {
@@ -131,6 +131,17 @@ else
 
 void AddStep(string attr, string expression, List<string> parameters, string folder)
 {
+    try
+    {
+        // Validate regex
+        _ = new Regex(expression);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Invalid regex skipped: [{attr}] {expression} — {ex.Message}");
+        return;
+    }
+
     Console.WriteLine($"✅ Matched [{attr}] {expression}");
 
     results.Add(new StepDefinition
